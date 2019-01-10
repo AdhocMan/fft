@@ -13,11 +13,16 @@ using fft_plan_device_handler_t = rocfft_plan;
 using fft_plan_device_handler_t = void*;
 #endif
 
-void initialize();
-void finalize();
-
+void initialize()
+{
+#if defined(__ROCM)
+#endif
 }
 
+void finalize();
+{
+#if defined(__ROCM)
+#endif
 }
 
 #endif
