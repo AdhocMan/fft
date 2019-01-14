@@ -27,9 +27,6 @@ int test_fft(cmd_args& args, device_t pu__)
 
     for (int ig = 0; ig < gvec.num_gvec(); ig++) {
         auto v = gvec.gvec(ig);
-        //if (Communicator::world().rank() == 0) {
-        //    printf("ig: %6i, gvec: %4i %4i %4i   ", ig, v[0], v[1], v[2]);
-        //}
         f.zero();
         f[ig] = 1.0;
         /* load local set of PW coefficients */
@@ -91,29 +88,28 @@ int run_test(cmd_args& args)
 
 int main(int argn, char **argv)
 {
-    std::cout << "aaaa" << "\n";
     cmd_args args;
     args.register_key("--cutoff=", "{double} cutoff radius in G-space");
 
     args.parse_args(argn, argv);
-    std::cout << "bbb" << "\n";
     if (args.exist("help")) {
         printf("Usage: %s [options]\n", argv[0]);
         args.print_help();
         return 0;
     }
-    std::cout << "ccc" << "\n";
 
     sirius::initialize(true);
-    std::cout << "eeee" << "\n";
-    printf("running %-30s : ", argv[0]);
+    if (Communicator::world().rank() == 0) {
+        printf("running %-30s : ", argv[0]);
+    }
     int result = run_test(args);
-    //if (result) {
-    //    printf("\x1b[31m" "Failed" "\x1b[0m" "\n");
-    //} else {
-    //    printf("\x1b[32m" "OK" "\x1b[0m" "\n");
-    //}
-    std::cout << "ddd" << "\n";
+    if (Communicator::world().rank() == 0) {
+        if (result) {
+            printf("\x1b[31m" "Failed" "\x1b[0m" "\n");
+        } else {
+            printf("\x1b[32m" "OK" "\x1b[0m" "\n");
+        }
+    }
     sirius::finalize();
 
     return result;

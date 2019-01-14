@@ -28,10 +28,14 @@
 #include <numeric>
 #include <map>
 #include <iostream>
+#include <assert.h>
+#include "memory.hpp"
 #include "fft3d_grid.hpp"
 #include "geometry3d.hpp"
 #include "serializer.hpp"
-//#include "constants.hpp"
+#include "splindex.hpp"
+#include "utils/utils.hpp"
+#include "utils/profiler.hpp"
 
 using namespace geometry3d;
 
@@ -611,8 +615,8 @@ class Gvec
     /// Return the volume of the real space unit cell that corresponds to the reciprocal lattice of G-vectors.
     inline double omega() const
     {
-        double const twopi = 6.28318530717958647692528676656;
-        return std::pow(twopi, 3) / std::abs(lattice_vectors().det());
+        double const twopi_pow3 = 248.050213442398561403810520537;
+        return twopi_pow3 / std::abs(lattice_vectors().det());
     }
 
     /// Return the total number of G-vectors within the cutoff.
@@ -1162,7 +1166,7 @@ class Gvec_partition
         return gvec_;
     }
 
-    void gather_pw_fft(double_complex* f_pw_local__, double_complex* f_pw_fft__) const
+    void gather_pw_fft(std::complex<double>* f_pw_local__, std::complex<double>* f_pw_fft__) const
     {
         int rank = gvec().comm().rank();
         /* collect scattered PW coefficients */
@@ -1170,7 +1174,7 @@ class Gvec_partition
                                    gvec_fft_slab().counts.data(), gvec_fft_slab().offsets.data());
     }
 
-    void gather_pw_global(double_complex* f_pw_fft__, double_complex* f_pw_global__) const
+    void gather_pw_global(std::complex<double>* f_pw_fft__, std::complex<double>* f_pw_global__) const
     {
         for (int ig = 0; ig < gvec().count(); ig++) {
             /* position inside fft buffer */

@@ -48,7 +48,6 @@ namespace sddk {
 
 }
 
-#include "profiler.hpp"
 #include "communicator.hpp"
 #include "mpi_grid.hpp"
 #include "blacs_grid.hpp"
