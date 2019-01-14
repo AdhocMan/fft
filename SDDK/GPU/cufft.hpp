@@ -77,7 +77,7 @@ inline void error_message(cufftResult result)
         gethostname(nm, 1024);                                                      \
         printf("hostname: %s\n", nm);                                               \
         printf("Error in %s at line %i of file %s: ", #func__, __LINE__, __FILE__); \
-        cufft::error_message(result);                                                      \
+        cufft::error_message(result);                                               \
         exit(-100);                                                                 \
     }                                                                               \
 }
@@ -106,18 +106,10 @@ inline size_t get_work_size(int ndim, int* dims, int nfft)
     return work_size;
 }
 
-inline size_t create_batch_plan(cufftHandle plan, int rank, int* dims, int* embed, int stride, int dist, int nfft, int auto_alloc)
+inline size_t create_batch_plan(cufftHandle plan, int rank, int* dims, int* embed, int stride, int dist, int nfft, bool auto_alloc)
 {
-    int fft_size = 1;
-    for (int i = 0; i < rank; i++) {
-        fft_size *= dims[i];
-    }
-    
-    if (auto_alloc) {
-        CALL_CUFFT(cufftSetAutoAllocation, (plan, true));
-    } else {
-        CALL_CUFFT(cufftSetAutoAllocation, (plan, false));
-    }
+    CALL_CUFFT(cufftSetAutoAllocation, (plan, auto_alloc));
+
     size_t work_size;
 
     /* 1D

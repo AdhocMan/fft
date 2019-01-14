@@ -31,7 +31,7 @@
 #include "fft3d_grid.hpp"
 #include "geometry3d.hpp"
 #include "serializer.hpp"
-#include "constants.hpp"
+//#include "constants.hpp"
 
 using namespace geometry3d;
 
@@ -611,6 +611,7 @@ class Gvec
     /// Return the volume of the real space unit cell that corresponds to the reciprocal lattice of G-vectors.
     inline double omega() const
     {
+        double const twopi = 6.28318530717958647692528676656;
         return std::pow(twopi, 3) / std::abs(lattice_vectors().det());
     }
 

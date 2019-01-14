@@ -31,6 +31,10 @@
 #include <complex>
 #include <cstdarg>
 #include <functional>
+#include <memory>
+#include <algorithm>
+#include <cstring>
+#include <map>
 #include <GPU/acc.hpp>
 
 namespace sddk {

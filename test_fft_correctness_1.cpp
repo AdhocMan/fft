@@ -50,6 +50,8 @@ int test_fft(cmd_args& args, device_t pu__)
             }
         }
 
+        double const twopi = 6.28318530717958647692528676656;
+
         double diff = 0;
         /* loop over 3D array (real space) */
         for (int j0 = 0; j0 < fft.size(0); j0++) {
@@ -89,24 +91,29 @@ int run_test(cmd_args& args)
 
 int main(int argn, char **argv)
 {
+    std::cout << "aaaa" << "\n";
     cmd_args args;
     args.register_key("--cutoff=", "{double} cutoff radius in G-space");
 
     args.parse_args(argn, argv);
+    std::cout << "bbb" << "\n";
     if (args.exist("help")) {
         printf("Usage: %s [options]\n", argv[0]);
         args.print_help();
         return 0;
     }
+    std::cout << "ccc" << "\n";
 
     sirius::initialize(true);
+    std::cout << "eeee" << "\n";
     printf("running %-30s : ", argv[0]);
     int result = run_test(args);
-    if (result) {
-        printf("\x1b[31m" "Failed" "\x1b[0m" "\n");
-    } else {
-        printf("\x1b[32m" "OK" "\x1b[0m" "\n");
-    }
+    //if (result) {
+    //    printf("\x1b[31m" "Failed" "\x1b[0m" "\n");
+    //} else {
+    //    printf("\x1b[32m" "OK" "\x1b[0m" "\n");
+    //}
+    std::cout << "ddd" << "\n";
     sirius::finalize();
 
     return result;

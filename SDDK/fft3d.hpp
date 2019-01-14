@@ -29,9 +29,12 @@
 #include "geometry3d.hpp"
 #include "fft3d_grid.hpp"
 #include "gvec.hpp"
-#ifdef __GPU
+#if defined(__GPU) && defined(__CUDA)
 #include "GPU/cufft.hpp"
 #include "GPU/fft_kernels.hpp"
+#endif
+#if defined(__GPU) && defined(__ROCM)
+#include "GPU/rocfft_interface.hpp"
 #endif
 
 // TODO: review the size of cufft_work_buf and fft_buffer_aux
@@ -96,7 +99,7 @@ class FFT3D : public FFT3D_grid
     /// Local size of z-dimension of FFT buffer.
     int local_size_z_;
 
-    /// Offset in the global z-dimension.
+    /// Offset in the global z-dimension index.
     int offset_z_;
 
     /// Main input/output buffer.
@@ -130,16 +133,18 @@ class FFT3D : public FFT3D_grid
     /// True if GPU-direct is enabled.
     bool is_gpu_direct_{false};
 
-#ifndef __GPU
-    typedef int cufftHandle;
-#endif
-    /// Handler for z-transform cuFFT plan.
-    cufftHandle cufft_plan_z_gvec_;
-    cufftHandle cufft_plan_z_gkvec_;
+    /// Handler for z-transform accelerator FFT plan.
+    void* acc_fft_plan_z_forward_gvec_;
+    void* acc_fft_plan_z_backward_gvec_;
 
-#ifdef __GPU
-    /// Handler for xy-transform cuFFT plan.
-    cufftHandle cufft_plan_xy_;
+    void* acc_fft_plan_z_forward_gkvec_;
+    void* acc_fft_plan_z_backward_gkvec_;
+
+    /// Handler for xy-transform accelerator FFT plan.
+    //void* acc_fft_plan_xy_;
+
+    void* acc_fft_plan_xy_forward_;
+    void* acc_fft_plan_xy_backward_;
 
     /// True if the cufft_plan_z handler was created and has to be destroyed.
     bool cufft_plan_z_gvec_created_{false};
@@ -163,8 +168,8 @@ class FFT3D : public FFT3D_grid
     /// Mapping of the {0,0,z} G-vectors to the FFT buffer for batched 1D transform in case of reduced G-vector list.
     mdarray<int, 1> map_gvec_to_fft_buffer_x0y0_;
 
-    int const cufft_stream_id{0};
-#endif
+    int const acc_fft_stream_id{0};
+
     /// Position of z-columns inside 2D FFT buffer.
     mdarray<int, 2> z_col_pos_;
 
@@ -178,6 +183,7 @@ class FFT3D : public FFT3D_grid
     /// Defines the distribution of G-vectors between the MPI ranks of FFT communicator.
     Gvec_partition const* gvec_partition_{nullptr};
 #ifdef __GPU
+#if defined(__CUDA)
     /// Initialize cuFFT plan for z-transformation of G-vector columns.
     inline void init_cufft_plan_z(Gvec_partition const& gvp__, int& zcol_count_max__, bool& cufft_plan_z_created__,
                                   cufftHandle& cufft_plan_z__)
@@ -198,6 +204,7 @@ class FFT3D : public FFT3D_grid
             cufft_plan_z_created__ = true;
         }
     }
+#endif
 #endif
 
     inline void reallocate_fft_buffer_aux(mdarray<double_complex, 1>& fft_buffer_aux__)
@@ -234,7 +241,7 @@ class FFT3D : public FFT3D_grid
      *  specifies the locatio of the data: host or device. */
     template <int direction, memory_t mem>
     void transform_z_serial(double_complex* data__, mdarray<double_complex, 1>& fft_buffer_aux__,
-                            cufftHandle& cufft_plan_z__)
+                            void* cufft_plan_z__)
     {
         // TODO: prepare data for mpi_a2a in case of memory_t::device
         //       in case of host memory this is already implemented
@@ -252,6 +259,7 @@ class FFT3D : public FFT3D_grid
         if (is_device_memory(mem)) {
             utils::timer t("sddk::FFT3D::transform_z_serial|gpu");
 #ifdef __GPU
+#if defined(__CUDA)
             switch (direction) {
                 case 1: {
                     /* load all columns into FFT buffer */
@@ -308,6 +316,7 @@ class FFT3D : public FFT3D_grid
                 }
             }
             acc::sync_stream(stream_id(cufft_stream_id));
+#endif
 #endif
         }
 
@@ -387,7 +396,7 @@ class FFT3D : public FFT3D_grid
 
     /// Transformation of z-columns.
     template <int direction, memory_t mem>
-    void transform_z(double_complex* data__, mdarray<double_complex, 1>& fft_buffer_aux__, cufftHandle cufft_plan_z__)
+    void transform_z(double_complex* data__, mdarray<double_complex, 1>& fft_buffer_aux__, void* cufft_plan_z__)
     {
         PROFILE("sddk::FFT3D::transform_z");
 
@@ -427,7 +436,6 @@ class FFT3D : public FFT3D_grid
                     comm_.alltoall(&fft_buffer_[0], &send.counts[0], &send.offsets[0], &fft_buffer_aux__[0],
                                    &recv.counts[0], &recv.offsets[0]);
                 }
-#ifdef __GPU
                 if (is_device_memory(mem) && is_gpu_direct_) {
                     /* copy auxiliary buffer because it will be use as the output buffer in the following mpi_a2a */
                     acc::copy<double_complex>(fft_buffer_.at(memory_t::device), fft_buffer_aux__.at(memory_t::device),
@@ -441,7 +449,6 @@ class FFT3D : public FFT3D_grid
                 if (is_device_memory(mem) && !is_gpu_direct_) {
                     fft_buffer_aux__.copy_to(memory_t::device, 0, gvec_partition_->zcol_count_fft() * size(2));
                 }
-#endif
             }
         }
 
@@ -507,6 +514,7 @@ class FFT3D : public FFT3D_grid
         switch (pu_) {
             case device_t::GPU: {
 #ifdef __GPU
+#if defined(__CUDA)
                 /* stream #0 will be doing cuFFT */
                 switch (direction) {
                     case 1: {
@@ -530,6 +538,7 @@ class FFT3D : public FFT3D_grid
                     }
                 }
                 acc::sync_stream(stream_id(cufft_stream_id));
+#endif
 #endif
                 break;
             }
@@ -598,6 +607,7 @@ class FFT3D : public FFT3D_grid
         int size_xy = size(0) * size(1);
 
 #ifdef __GPU
+#if defined(__CUDA)
         if (pu_ == GPU) {
             /* stream #0 will be doing cuFFT */
             switch (direction) {
@@ -624,6 +634,7 @@ class FFT3D : public FFT3D_grid
             }
             acc::sync_stream(stream_id(cufft_stream_id));
         }
+#endif
 #endif
 
         if (pu_ == CPU) {
@@ -740,24 +751,29 @@ class FFT3D : public FFT3D_grid
                                                     (fftw_complex*)fftw_buffer_xy_[i], FFTW_BACKWARD, FFTW_ESTIMATE);
         }
 
-#ifdef __GPU
-        if (pu_ == GPU) {
+#if defined(__GPU)
+        if (pu_ == device_t::GPU) {
 
-#ifdef __GPU_DIRECT
+#if defined(__GPU_DIRECT)
 #pragma message "=========== GPU direct is enabled =============="
             is_gpu_direct_ = true;
 #endif
 
-            int auto_alloc{0};
+            bool auto_alloc{false};
             int dim_xy[] = {size(1), size(0)};
+#if defined(__CUDA)
             /* create plan handler for xy transform */
-            cufft::create_plan_handle(&cufft_plan_xy_);
+            cufft::create_plan_handle(&acc_fft_plan_xy_);
             /* create plan for xy transform */
-            cufft::create_batch_plan(cufft_plan_xy_, 2, dim_xy, dim_xy, 1, size(0) * size(1), local_size_z_,
+            cufft::create_batch_plan(acc_fft_plan_xy_, 2, dim_xy, dim_xy, 1, size(0) * size(1), local_size_z_,
                                      auto_alloc);
             /* stream #0 will execute FFTs */
-            cufft::set_stream(cufft_plan_xy_, 0);
-
+            cufft::set_stream(acc_fft_plan_xy_, acc_fft_stream_id);
+#endif
+#if defined(__ROCM)
+           acc_fft_plan_xy_forward_ = rocfft::create_batch_plan(-1, 2, dim_xy, size(0) * size(1), local_size_z_,
+                                                                auto_alloc);
+#endif
             /* allocate arrays with z- offsets and sizes on the host and device*/
             z_offsets_ = mdarray<int, 1>(comm_.size(), memory_t::host);
             z_offsets_.allocate(memory_t::device);
@@ -797,7 +813,8 @@ class FFT3D : public FFT3D_grid
             fftw_destroy_plan(plan_backward_xy_[i]);
         }
 #ifdef __GPU
-        if (pu_ == GPU) {
+        if (pu_ == device_t::GPU) {
+#if defined(__CUDA)
             cufft::destroy_plan_handle(cufft_plan_xy_);
             if (cufft_plan_z_gvec_created_) {
                 cufft::destroy_plan_handle(cufft_plan_z_gvec_);
@@ -805,6 +822,11 @@ class FFT3D : public FFT3D_grid
             if (cufft_plan_z_gkvec_created_) {
                 cufft::destroy_plan_handle(cufft_plan_z_gkvec_);
             }
+#endif
+#if defined(__ROCM)
+            rocfft::destroy_plan(acc_fft_plan_xy_forward_);
+            rocfft::destroy_plan(acc_fft_plan_xy_backward_);
+#endif
         }
 #endif
     }
@@ -991,13 +1013,18 @@ class FFT3D : public FFT3D_grid
 
                 int zcol_count_max{0};
                 if (gvp__.gvec().bare()) {
+#if defined(__CUDA)
                     init_cufft_plan_z(gvp__, zcol_gvec_count_max_, cufft_plan_z_gvec_created_, cufft_plan_z_gvec_);
+#endif
                     zcol_count_max = zcol_gvec_count_max_;
                 } else {
+#if defined(__CUDA)
                     init_cufft_plan_z(gvp__, zcol_gkvec_count_max_, cufft_plan_z_gkvec_created_, cufft_plan_z_gkvec_);
+#endif
                     zcol_count_max = zcol_gkvec_count_max_;
                 }
 
+#if defined(__CUDA)
                 /* maximum worksize of z and xy transforms */
                 work_size = std::max(cufft::get_work_size(2, dims_xy, local_size_z_),
                                      cufft::get_work_size(1, dim_z, zcol_count_max));
@@ -1015,7 +1042,7 @@ class FFT3D : public FFT3D_grid
                 } else {
                     cufft::set_work_area(cufft_plan_z_gkvec_, cufft_work_buf_.at(memory_t::device));
                 }
-
+#endif
                 fft_buffer_aux1_.allocate(memory_t::device);
                 fft_buffer_aux2_.allocate(memory_t::device);
 
@@ -1065,9 +1092,9 @@ class FFT3D : public FFT3D_grid
         switch (direction) {
             case 1: {
                 if (gvec_partition_->gvec().bare()) {
-                    transform_z<direction, mem>(data__, fft_buffer_aux1_, cufft_plan_z_gvec_);
+                    transform_z<direction, mem>(data__, fft_buffer_aux1_, acc_fft_plan_z_backward_gvec_);
                 } else {
-                    transform_z<direction, mem>(data__, fft_buffer_aux1_, cufft_plan_z_gkvec_);
+                    transform_z<direction, mem>(data__, fft_buffer_aux1_, acc_fft_plan_z_backward_gkvec_);
                 }
                 transform_xy<direction>(fft_buffer_aux1_);
                 break;
@@ -1075,9 +1102,9 @@ class FFT3D : public FFT3D_grid
             case -1: {
                 transform_xy<direction>(fft_buffer_aux1_);
                 if (gvec_partition_->gvec().bare()) {
-                    transform_z<direction, mem>(data__, fft_buffer_aux1_, cufft_plan_z_gvec_);
+                    transform_z<direction, mem>(data__, fft_buffer_aux1_, acc_fft_plan_z_forward_gvec_);
                 } else {
-                    transform_z<direction, mem>(data__, fft_buffer_aux1_, cufft_plan_z_gkvec_);
+                    transform_z<direction, mem>(data__, fft_buffer_aux1_, acc_fft_plan_z_forward_gkvec_);
                 }
                 break;
             }
@@ -1108,11 +1135,11 @@ class FFT3D : public FFT3D_grid
         switch (direction) {
             case 1: {
                 if (gvec_partition_->gvec().bare()) {
-                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, cufft_plan_z_gvec_);
-                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, cufft_plan_z_gvec_);
+                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, acc_fft_plan_z_backward_gvec_);
+                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, acc_fft_plan_z_backward_gvec_);
                 } else {
-                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, cufft_plan_z_gkvec_);
-                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, cufft_plan_z_gkvec_);
+                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, acc_fft_plan_z_backward_gkvec_);
+                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, acc_fft_plan_z_backward_gkvec_);
                 }
                 transform_xy<direction>(fft_buffer_aux1_, fft_buffer_aux2_);
                 break;
@@ -1120,11 +1147,11 @@ class FFT3D : public FFT3D_grid
             case -1: {
                 transform_xy<direction>(fft_buffer_aux1_, fft_buffer_aux2_);
                 if (gvec_partition_->gvec().bare()) {
-                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, cufft_plan_z_gvec_);
-                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, cufft_plan_z_gvec_);
+                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, acc_fft_plan_z_forward_gvec_);
+                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, acc_fft_plan_z_forward_gvec_);
                 } else {
-                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, cufft_plan_z_gkvec_);
-                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, cufft_plan_z_gkvec_);
+                    transform_z<direction, mem>(data1__, fft_buffer_aux1_, acc_fft_plan_z_forward_gkvec_);
+                    transform_z<direction, mem>(data2__, fft_buffer_aux2_, acc_fft_plan_z_forward_gkvec_);
                 }
                 break;
             }
