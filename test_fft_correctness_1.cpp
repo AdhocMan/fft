@@ -20,6 +20,7 @@ int test_fft(cmd_args& args, device_t pu__)
     mdarray<double_complex, 1> f(gvec.num_gvec());
     if (pu__ == GPU) {
         f.allocate(memory_t::device);
+        printf("running on GPU\n");
     }
     mdarray<double_complex, 1> ftmp(gvecp.gvec_count_fft());
 

@@ -78,7 +78,7 @@ inline void initialize(bool call_mpi_init__ = true)
 #if defined(__CUDA)
         cublas::create_stream_handles();
         cublas::xt::create_handle();
-        cusolver::create_handle();
+        //cusolver::create_handle();
 #endif
     }
 #if defined(__APEX)
