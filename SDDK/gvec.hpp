@@ -843,6 +843,9 @@ class Gvec
         return gvec_base_mapping_(igloc_base__);
     }
 
+    friend void serialize(serializer& s__, Gvec& gv__);
+    friend void deserialize(serializer& s__, Gvec& gv__);
+
     /// Serialize to a string of bytes.
     void pack(serializer& s__) const
     {
