@@ -12,6 +12,8 @@ int test_fft(cmd_args& args, device_t pu__)
 
     FFT3D fft(find_translations(cutoff, M), Communicator::world(), pu__);
 
+    std::cout << "FFT grid: " << fft.size(0) << " " << fft.size(1) << " " << fft.size(2) << "\n";
+
     Gvec gvec(M, cutoff, Communicator::world(), false);
     Gvec_partition gvecp(gvec, Communicator::world(), Communicator::self());
 
@@ -23,6 +25,9 @@ int test_fft(cmd_args& args, device_t pu__)
         printf("running on GPU\n");
     }
     mdarray<double_complex, 1> ftmp(gvecp.gvec_count_fft());
+    if (pu__ == GPU) {
+        ftmp.allocate(memory_t::device);
+    }
 
     int result{0};
 
@@ -40,9 +45,9 @@ int test_fft(cmd_args& args, device_t pu__)
                 break;
             }
             case GPU: {
-                //f.copy<memory_t::host, memory_t::device>();
-                //fft.transform<1, GPU>(gvec.partition(), f.at<GPU>(gvec.partition().gvec_offset_fft()));
-                fft.transform<1, memory_t::host>(ftmp.at(memory_t::host));
+                ftmp.copy_to(memory_t::device);
+                fft.transform<1, memory_t::device>(ftmp.at(memory_t::device));
+                //fft.transform<1, memory_t::host>(ftmp.at(memory_t::host));
                 fft.buffer().copy_to(memory_t::host);
                 break;
             }
