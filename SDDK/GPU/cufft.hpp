@@ -140,16 +140,16 @@ inline void set_stream(void* plan__, stream_id sid__)
     CALL_CUFFT(cufftSetStream, (*static_cast<cufftHandle*>(plan__), acc::stream(sid__)));
 }
 
-inline void forward_transform(void* plan, cuDoubleComplex* fft_buffer)
+inline void forward_transform(void* plan, std::complex<double>* fft_buffer)
 {
     //CUDA_timer t("cufft_forward_transform");
-    CALL_CUFFT(cufftExecZ2Z, (*static_cast<cufftHandle*>(plan), fft_buffer, fft_buffer, CUFFT_FORWARD));
+    CALL_CUFFT(cufftExecZ2Z, (*static_cast<cufftHandle*>(plan), (cuDoubleComplex*)fft_buffer, (cuDoubleComplex*)fft_buffer, CUFFT_FORWARD));
 }
 
-inline void backward_transform(void* plan, cuDoubleComplex* fft_buffer)
+inline void backward_transform(void* plan, std::complex<double>* fft_buffer)
 {
     //CUDA_timer t("cufft_backward_transform");
-    CALL_CUFFT(cufftExecZ2Z, (*static_cast<cufftHandle*>(plan), fft_buffer, fft_buffer, CUFFT_INVERSE));
+    CALL_CUFFT(cufftExecZ2Z, (*static_cast<cufftHandle*>(plan), (cuDoubleComplex*)fft_buffer, (cuDoubleComplex*)fft_buffer, CUFFT_INVERSE));
 }
 
 } // namespace cufft
