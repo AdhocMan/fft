@@ -206,7 +206,7 @@ class FFT3D : public FFT3D_grid
                     int dim_z[] = {size(2)};
 #if defined(__CUDA)
                     *acc_fft_plan_forward__ = cufft::create_batch_plan(1, dim_z, dim_z, 1, size(2), zcol_count_max__, false);
-                    cufft::set_stream(*acc_fft_plan_z__, stream_id(acc_fft_stream_id_));
+                    cufft::set_stream(*acc_fft_plan_forward__, stream_id(acc_fft_stream_id_));
                     /* in case of CUDA this is an alias */
                     *acc_fft_plan_backward__ = *acc_fft_plan_forward__;
 #elif defined(__ROCM)
@@ -282,6 +282,14 @@ class FFT3D : public FFT3D_grid
                     }
                     /* transform all columns */
                     cufft::backward_transform(acc_fft_plan_z__, (cuDoubleComplex*)fft_buffer_aux__.at(memory_t::device));
+
+                    //cufft_repack_z_buffer(direction, comm_.size(), size(2), num_zcol_local, max_zloc_size_,
+                    //                      z_offsets_.at(memory_t::device), z_sizes_.at(memory_t::device),
+                    //                      (cuDoubleComplex*)fft_buffer_aux__.at(memory_t::device),
+                    //                      (cuDoubleComplex*)fft_buffer_.at(memory_t::device));
+
+                    //acc::copy(fft_buffer_aux__.at(memory_t::device), fft_buffer_.at(memory_t::device),
+                    //          local_size_z() * gvec_partition_->gvec().num_zcol());
 
                     assert(acc_fft_work_buf_.size() >= sizeof(double_complex) * fft_buffer_aux__.size());
 
@@ -1094,9 +1102,6 @@ class FFT3D : public FFT3D_grid
             TERMINATE("FFT3D is not ready");
         }
 
-        // TODO: can it be moved to prepare()?
-        //reallocate_fft_buffer_aux(fft_buffer_aux1_);
-
         switch (direction) {
             case 1: {
                 if (gvec_partition_->gvec().bare()) {
@@ -1135,10 +1140,6 @@ class FFT3D : public FFT3D_grid
         if (!gvec_partition_->gvec().reduced()) {
             TERMINATE("reduced set of G-vectors is required");
         }
-
-        // TODO: can it be moved to prepare()?
-       // reallocate_fft_buffer_aux(fft_buffer_aux1_);
-        //reallocate_fft_buffer_aux(fft_buffer_aux2_);
 
         switch (direction) {
             case 1: {
