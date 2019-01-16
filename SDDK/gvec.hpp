@@ -803,7 +803,7 @@ class Gvec
            #2 (negative and positive)  ____________ 3   4  0  1  2 _________
            #3 (all positive)           _____________________  0  1  2  3 ___
 
-           Remember how FFT frequencies are stored: firs positive frequences, then negative in the reverse order
+           Remember how FFT frequencies are stored: first positive frequences, then negative in the reverse order
 
            subtract first z-coordinate in column from the current z-coordinate of G-vector: in case #1 or #3 this
            already gives a proper offset, in case #2 storage of FFT frequencies must be taken into account
