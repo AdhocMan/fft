@@ -43,10 +43,10 @@ __global__ void repack_z_buffer_gpu_kernel(int size_z,
     int local_zsize = local_z_sizes[rank];
     if (iz < local_zsize) {
         int offs = local_z_offsets[rank];
-        if (direction == 1) {
+        if (direction == -11) {
             z_sticks_local[offs + iz + izcol * size_z] = a2a_buffer[offs * num_zcol_loc + izcol * local_zsize + iz];
         }
-        if (direction == -1) {
+        if (direction == 1) {
             a2a_buffer[offs * num_zcol_loc + izcol * local_zsize + iz] = z_sticks_local[offs + iz + izcol * size_z];
         }
     }

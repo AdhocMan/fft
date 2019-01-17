@@ -1,0 +1,3 @@
+all:
+	nvcc -D__GPU -D__CUDA -c SDDK/GPU/fft_kernels.cu
+	mpic++ -O3 -g  -DNDEBUG -D__GPU -D__CUDA -fopenmp test_fft_correctness_1.cpp -I./SDDK -I./  -I/cm/shared/apps/openpower/FutureSystem/cuda/cuda-10.0/include -lcufft -lcublas -lcudart fft_kernels.o -L/cm/shared/apps/openpower/FutureSystem/cuda/cuda-10.0/lib64 -lcufft -lcublas -lcudart -L$(HOME)/local -lfftw3

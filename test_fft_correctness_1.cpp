@@ -22,7 +22,6 @@ int test_fft(cmd_args& args, device_t pu__)
     mdarray<double_complex, 1> f(gvec.num_gvec());
     if (pu__ == GPU) {
         f.allocate(memory_t::device);
-        printf("running on GPU\n");
     }
     mdarray<double_complex, 1> ftmp(gvecp.gvec_count_fft());
     if (pu__ == GPU) {
@@ -85,9 +84,16 @@ int test_fft(cmd_args& args, device_t pu__)
 
 int run_test(cmd_args& args)
 {
-    int result = test_fft(args, CPU);
+    int result = test_fft(args, device_t::CPU);
+    if (Communicator::world().rank() == 0) {
+        printf("running on CPU: number of errors: %i\n", result);
+    }
 #ifdef __GPU
-    result += test_fft(args, GPU);
+    int result1 = test_fft(args, device_t::GPU);
+    if (Communicator::world().rank() == 0) {
+        printf("running on GPU: number of errors: %i\n", result1);
+    }
+    result += result1;
 #endif
     return result;
 }
@@ -105,9 +111,6 @@ int main(int argn, char **argv)
     }
 
     sirius::initialize(true);
-    if (Communicator::world().rank() == 0) {
-        printf("running %-30s : ", argv[0]);
-    }
     int result = run_test(args);
     if (Communicator::world().rank() == 0) {
         if (result) {
