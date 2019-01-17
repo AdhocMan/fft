@@ -4,6 +4,7 @@
 
 using namespace sirius;
 
+template <memory_t mem__>
 int test_fft(cmd_args& args, device_t pu__)
 {
     double cutoff = args.value<double>("cutoff", 10);
@@ -45,8 +46,7 @@ int test_fft(cmd_args& args, device_t pu__)
             }
             case GPU: {
                 ftmp.copy_to(memory_t::device);
-                fft.transform<1, memory_t::device>(ftmp.at(memory_t::device));
-                //fft.transform<1, memory_t::host>(ftmp.at(memory_t::host));
+                fft.transform<1, mem__>(ftmp.at(mem__));
                 fft.buffer().copy_to(memory_t::host);
                 break;
             }
@@ -84,14 +84,19 @@ int test_fft(cmd_args& args, device_t pu__)
 
 int run_test(cmd_args& args)
 {
-    int result = test_fft(args, device_t::CPU);
+    int result = test_fft<memory_t::host>(args, device_t::CPU);
     if (Communicator::world().rank() == 0) {
         printf("running on CPU: number of errors: %i\n", result);
     }
 #ifdef __GPU
-    int result1 = test_fft(args, device_t::GPU);
+    int result1 = test_fft<memory_t::host>(args, device_t::GPU);
     if (Communicator::world().rank() == 0) {
-        printf("running on GPU: number of errors: %i\n", result1);
+        printf("running on GPU, using host memory pointer: number of errors: %i\n", result1);
+    }
+    result += result1;
+    result1 = test_fft<memory_t::device>(args, device_t::GPU);
+    if (Communicator::world().rank() == 0) {
+        printf("running on GPU, using device memory pointer: number of errors: %i\n", result1);
     }
     result += result1;
 #endif
