@@ -209,7 +209,9 @@ class FFT3D : public FFT3D_grid
                         rocfft::destroy_plan_handle(*acc_fft_plan_backward__);
 #endif
                     }
+#if defined(__CUDA) || defined(__ROCM)
                     int dim_z[] = {size(2)};
+#endif
 #if defined(__CUDA)
                     *acc_fft_plan_forward__ = cufft::create_batch_plan(1, dim_z, dim_z, 1, size(2), zcol_count_max__, false);
                     cufft::set_stream(*acc_fft_plan_forward__, stream_id(acc_fft_stream_id_));
@@ -992,7 +994,6 @@ class FFT3D : public FFT3D_grid
         switch (pu_) {
             case device_t::GPU: {
                 utils::timer t2("sddk::FFT3D::prepare|gpu");
-                size_t work_size;
                 map_gvec_to_fft_buffer_ = mdarray<int, 1>(gvp__.gvec_count_fft(), memory_t::host,
                                                           "FFT3D.map_gvec_to_fft_buffer_");
                 /* loop over local set of columns */
@@ -1024,16 +1025,17 @@ class FFT3D : public FFT3D_grid
                     }
                     map_gvec_to_fft_buffer_x0y0_.allocate(memory_t::device).copy_to(memory_t::device);
                 }
-
-                int dim_z[]   = {size(2)};
-                int dims_xy[] = {size(1), size(0)};
-
+#if defined(__CUDA) || defined(__ROCM)
                 int zcol_count_max{0};
                 if (gvp__.gvec().bare()) {
                     zcol_count_max = zcol_gvec_count_max_;
                 } else {
                     zcol_count_max = zcol_gkvec_count_max_;
                 }
+                size_t work_size;
+                int dim_z[]   = {size(2)};
+                int dims_xy[] = {size(1), size(0)};
+#endif
 
 #if defined(__CUDA)
                 /* maximum worksize of z and xy transforms */

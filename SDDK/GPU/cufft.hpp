@@ -85,6 +85,7 @@ inline void error_message(cufftResult result)
 inline void destroy_plan_handle(void* plan)
 {
     CALL_CUFFT(cufftDestroy, (*static_cast<cufftHandle*>(plan)));
+    delete static_cast<cufftHandle*>(plan);
 }
 
 // Size of work buffer in bytes

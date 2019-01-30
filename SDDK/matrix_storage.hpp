@@ -446,7 +446,7 @@ class matrix_storage<T, matrix_storage_t::slab>
                 }
             }
         } else {
-#if defined(__GPU) && defined(__CUDA)
+#if defined(__GPU)
             scale_matrix_elements_gpu(prime().at(mem__, 0, i0__), prime().ld(), num_rows_loc(), n__, beta__);
 #endif
         }
@@ -481,7 +481,7 @@ class matrix_storage<T, matrix_storage_t::slab>
             case device_t::GPU: {
                 mdarray<double_complex, 1> cs1(n__, memory_t::host, "checksum");
                 cs1.allocate(memory_t::device).zero(memory_t::device);
-#if defined(__GPU) && defined(__CUDA)
+#if defined(__GPU)
                 add_checksum_gpu(prime().at(memory_t::device, 0, i0__), num_rows_loc(), n__, cs1.at(memory_t::device));
                 cs1.copy_to(memory_t::host);
                 cs = cs1.checksum();
