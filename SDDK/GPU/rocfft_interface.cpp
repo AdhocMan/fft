@@ -72,4 +72,5 @@ size_t get_work_size(void* handler)
     return work_size;
 }
 
+// TODO: set work size
 }

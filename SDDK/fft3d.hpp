@@ -1053,6 +1053,7 @@ class FFT3D : public FFT3D_grid
                     cufft::set_work_area(acc_fft_plan_z_forward_gkvec_, acc_fft_work_buf_.at(memory_t::device));
                 }
 #endif
+                //TODO set work size for ROCM
                 fft_buffer_aux1_.allocate(memory_t::device);
                 fft_buffer_aux2_.allocate(memory_t::device);
                 fft_buffer_.allocate(memory_t::device);
