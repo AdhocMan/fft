@@ -4,7 +4,6 @@
 #   find_package(ROCM [REQUIRED] [QUIET] COMPONENTS [components ...] )
 #
 # Compnents available:
-#  - hcc
 #  - hip
 #  - hipblas
 #  - hipsparse
@@ -15,14 +14,11 @@
 #   ROCM_FOUND ----------- true if fftw3 is found on the system
 #   ROCM_LIBRARIES ------- full path to fftw3 library
 #   ROCM_INCLUDE_DIRS ---- fftw3 include directory
+#   ROCM_HCC_COMPILER ---- fftw3 include directory
 #
 # The following variables can be set to specify a search location
 #   ROCM_ROOT ------------ if set, the libraries are exclusively searched under this path
 #   {compnents}_ROOT ------ if set, search for component specific libraries at given path. Takes precedence over ROCM_ROOT
-
-if(NOT ROCM_FIND_COMPONENTS)
-    message(FATAL_ERROR "No compnents specified for FindROCM module!")
-endif()
 
 #If environment variable ROCM_ROOT is specified
 if(NOT ROCM_ROOT AND ENV{ROCM_ROOT})
@@ -34,6 +30,7 @@ set(ROCM_FOUND FALSE)
 set(ROCM_LIBRARIES)
 set(ROCM_INCLUDE_DIRS)
 
+include(FindPackageHandleStandardArgs)
 
 
 # Finds libraries and include path for rocm modules
@@ -63,7 +60,6 @@ function(find_rcm_module module_name)
     list(REMOVE_AT LIBRARY_NAMES 0)
 
     # handler for error messages
-    include(FindPackageHandleStandardArgs)
 
     if(ROOT_DIR)
         # Root directory set for individual module
@@ -87,7 +83,7 @@ function(find_rcm_module module_name)
         # find include directory
         find_path(
             INCLUDE_DIRS_${MODULE_NAME_UPPER}
-            NAMES ${module_name}/include
+            NAMES include
             PATHS ${ROOT_DIR}
             NO_DEFAULT_PATH
         )
@@ -150,25 +146,66 @@ function(find_rcm_module module_name)
         "ROCM module ${module_name} could not be found. Please specify ROCM_ROOT or ${MODULE_NAME_UPPER}_ROOT." 
         REQUIRED_VARS INCLUDE_DIRS_${MODULE_NAME_UPPER})
 
-    # set found variable
-    if(LIBRARIES_${MODULE_NAME_UPPER} AND INCLUDE_DIRS_${MODULE_NAME_UPPER})
-        set(ROCM_FOUND TRUE PARENT_SCOPE)
-    else()
-        set(ROCM_FOUND FALSE PARENT_SCOPE)
+    # set global variables
+    if(LIBRARIES_${MODULE_NAME_UPPER})
+        set(ROCM_LIBRARIES ${ROCM_LIBRARIES} ${LIBRARIES_${MODULE_NAME_UPPER}} PARENT_SCOPE)
+    endif()
+    if(INCLUDE_DIRS_${MODULE_NAME_UPPER})
+        set(ROCM_INCLUDE_DIRS ${ROCM_INCLUDE_DIRS} ${INCLUDE_DIRS_${MODULE_NAME_UPPER}} PARENT_SCOPE)
     endif()
 
-    # set global variables
-    set(ROCM_LIBRARIES ${ROCM_LIBRARIES} ${LIBRARIES_${MODULE_NAME_UPPER}} PARENT_SCOPE)
-    set(ROCM_INCLUDE_DIRS ${ROCM_INCLUDE_DIRS} ${INCLUDE_DIRS_${MODULE_NAME_UPPER}} PARENT_SCOPE)
 endfunction()
+
+# find main hcc component
+set(ROCM_HCC_COMPILER)
+if(HCC_ROOT)
+        find_path(
+            ROCM_HCC_COMPILER
+            NAMES bin/hcc
+            PATHS ${HCC_ROOT}
+            NO_DEFAULT_PATH
+        )
+    find_package_handle_standard_args(ROCM FAIL_MESSAGE
+        "ROCM hcc compiler could not be found. Please specify ROCM_ROOT or HCC_ROOT."
+        REQUIRED_VARS ROCM_HCC_COMPILER)
+    set(ROCM_HCC_COMPILER ${ROCM_HCC_COMPILER}/bin/hcc)
+elseif(ROCM_ROOT)
+        find_path(
+            ROCM_HCC_COMPILER
+            NAMES hcc/bin/hcc
+            PATHS ${ROCM_ROOT}
+            NO_DEFAULT_PATH
+        )
+    find_package_handle_standard_args(ROCM FAIL_MESSAGE
+        "ROCM hcc compiler could not be found. Please specify ROCM_ROOT or HCC_ROOT."
+        REQUIRED_VARS ROCM_HCC_COMPILER)
+    set(ROCM_HCC_COMPILER ${ROCM_HCC_COMPILER}/hcc/bin/hcc)
+else()
+        find_path(
+            ROCM_HCC_COMPILER
+            NAMES hcc/bin/hcc
+            PATHS "/opt/rocm"
+        )
+    find_package_handle_standard_args(ROCM FAIL_MESSAGE
+        "ROCM hcc compiler could not be found. Please specify ROCM_ROOT or HCC_ROOT."
+        REQUIRED_VARS ROCM_HCC_COMPILER)
+    set(ROCM_HCC_COMPILER ${ROCM_HCC_COMPILER}/hcc/bin/hcc)
+endif()
+if(ROCM_HCC_COMPILER)
+    set(ROCM_FOUND TRUE)
+    message(STATUS "Found ROCM hcc compiler at ${ROCM_HCC_COMPILER}. RECOMMENDED: set CXX compiler accordingly!")
+else()
+    set(ROCM_FOUND FALSE)
+endif()
+find_rcm_module(hcc LTO OptRemarks mcwamp mcwamp_cpu mcwamp_hsa hc_am)
+
+
 
 # find libraries for each specified components
 foreach(module_name IN LISTS ROCM_FIND_COMPONENTS)
     # set required libaries for each module
     if(${module_name} STREQUAL hip)
         find_rcm_module(hip hip_hcc)
-    elseif(${module_name} STREQUAL hcc)
-        find_rcm_module(hcc LTO OptRemarks mcwamp mcwamp_cpu mcwamp_hsa hc_am)
     elseif(${module_name} STREQUAL hipblas)
         find_rcm_module(hipblas hipblas)
     elseif(${module_name} STREQUAL hipblas)
@@ -182,7 +219,7 @@ foreach(module_name IN LISTS ROCM_FIND_COMPONENTS)
     elseif(${module_name} STREQUAL rocsparse)
         find_rcm_module(rocsparse rocsparse)
     elseif(${module_name} STREQUAL rocfft)
-        find_rcm_module(rocsparse rocfft rocfft-device)
+        find_rcm_module(rocfft rocfft rocfft-device)
     else()
         message(FATAL_ERROR "Unrecognized component \"${module_name}\" in FindROCM module!")
     endif()
