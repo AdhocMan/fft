@@ -13,7 +13,7 @@
 
 
 #If environment variable FFTW_ROOT is specified
-if(NOT FFTW_ROOT AND ENV{FFTWDIR})
+if(NOT FFTW_ROOT AND ENV{FFTW_ROOT})
     file(TO_CMAKE_PATH "$ENV{FFTW_ROOT}" FFTW_ROOT)
     set(FFTW_ROOT "${FFTW_ROOT}" CACHE PATH "Prefix for fftw3 installation.")
 endif()

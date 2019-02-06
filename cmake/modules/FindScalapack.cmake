@@ -13,7 +13,7 @@
 
 
 #If environment variable Scalapack_ROOT is specified
-if(NOT Scalapack_ROOT AND ENV{ScalapackDIR})
+if(NOT Scalapack_ROOT AND ENV{Scalapack_ROOT})
     file(TO_CMAKE_PATH "$ENV{Scalapack_ROOT}" Scalapack_ROOT)
     set(Scalapack_ROOT "${Scalapack_ROOT}" CACHE PATH "Prefix for scalapack installation.")
 endif()
