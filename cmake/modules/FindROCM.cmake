@@ -87,6 +87,10 @@ function(find_rcm_module module_name)
             PATHS ${ROOT_DIR}
             NO_DEFAULT_PATH
         )
+        # set include directory for module if found
+        if(INCLUDE_DIRS_${MODULE_NAME_UPPER})
+            set(INCLUDE_DIRS_${MODULE_NAME_UPPER} ${INCLUDE_DIRS_${MODULE_NAME_UPPER}}/include)
+        endif()
     elseif(ROCM_ROOT)
         #Root directory set for rocm
 
@@ -111,6 +115,10 @@ function(find_rcm_module module_name)
             PATHS ${ROCM_ROOT}
             NO_DEFAULT_PATH
         )
+        # set include directory for module if found
+        if(INCLUDE_DIRS_${MODULE_NAME_UPPER})
+            set(INCLUDE_DIRS_${MODULE_NAME_UPPER} ${INCLUDE_DIRS_${MODULE_NAME_UPPER}}/${module_name}/include)
+        endif()
     else()
         # No root directory set
 
@@ -134,12 +142,12 @@ function(find_rcm_module module_name)
             NAMES ${module_name}/include
             PATHS "/opt/rocm/"
         )
+        # set include directory for module if found
+        if(INCLUDE_DIRS_${MODULE_NAME_UPPER})
+            set(INCLUDE_DIRS_${MODULE_NAME_UPPER} ${INCLUDE_DIRS_${MODULE_NAME_UPPER}}/${module_name}/include)
+        endif()
     endif()
 
-    # set include directory for module if found
-    if(INCLUDE_DIRS_${MODULE_NAME_UPPER})
-        set(INCLUDE_DIRS_${MODULE_NAME_UPPER} ${INCLUDE_DIRS_${MODULE_NAME_UPPER}}/${module_name}/include)
-    endif()
 
     # check if all required parts found
     find_package_handle_standard_args(ROCM FAIL_MESSAGE
