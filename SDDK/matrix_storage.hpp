@@ -26,6 +26,7 @@
 #define __MATRIX_STORAGE_HPP__
 
 #include "gvec.hpp"
+#include "acc.hpp"
 
 #ifdef __GPU
 extern "C" void add_checksum_gpu(std::complex<double>* wf__,
