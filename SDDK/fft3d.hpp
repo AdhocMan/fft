@@ -205,8 +205,8 @@ class FFT3D : public FFT3D_grid
             zcol_count_max__ = gvp__.zcol_count_fft();
             switch (pu_) {
                 case device_t::GPU: {
-                    if (*acc_fft_plan_forward__) {
 #if defined(__GPU)
+                    if (*acc_fft_plan_forward__) {
                         GPUFFT::destroy_plan_handle(*acc_fft_plan_forward__);
                     }
                     int dim_z[] = {size(2)};
