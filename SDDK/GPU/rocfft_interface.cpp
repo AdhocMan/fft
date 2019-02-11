@@ -49,7 +49,7 @@ void destroy_plan_handle(void* plan)
     if (handler->plan_backward != nullptr)
         CALL_ROCFFT(rocfft_plan_destroy, (handler->plan_backward));
     if (handler->info != nullptr) CALL_ROCFFT(rocfft_execution_info_destroy, (handler->info));
-    CALL_HIP(hipFree(handler->work_buffer));
+    if (handler->work_buffer != nullptr) CALL_HIP(hipFree(handler->work_buffer));
 
     // free handler itself
     delete handler;

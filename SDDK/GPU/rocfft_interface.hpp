@@ -4,6 +4,7 @@
 #ifndef __ROCFFT_INTERFACE_HPP__
 #define __ROCFFT_INTERFACE_HPP__
 #include<complex>
+#include "acc.hpp"
 
 namespace rocfft
 {
