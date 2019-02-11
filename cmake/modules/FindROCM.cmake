@@ -11,10 +11,11 @@
 #  - rocsparse
 #
 # It sets the following variables:
-#   ROCM_FOUND ----------- true if fftw3 is found on the system
-#   ROCM_LIBRARIES ------- full path to fftw3 library
-#   ROCM_INCLUDE_DIRS ---- fftw3 include directory
-#   ROCM_HCC_COMPILER ---- fftw3 include directory
+#   ROCM_FOUND ----------- true if ROCM is found on the system
+#   ROCM_LIBRARIES ------- full path to ROCM
+#   ROCM_INCLUDE_DIRS ---- ROCM include directories
+#   ROCM_HCC_COMPILER ---- ROCM HCC compiler
+#   [ROCM_HIP_COMPILER]- ROCM HIPCC compiler (only defined of hip component requested)
 #
 # The following variables can be set to specify a search location
 #   ROCM_ROOT ------------ if set, the libraries are exclusively searched under this path
@@ -29,6 +30,8 @@ endif()
 set(ROCM_FOUND FALSE)
 set(ROCM_LIBRARIES)
 set(ROCM_INCLUDE_DIRS)
+set(ROCM_${MODULE_NAME_UPPER}_COMPILER)
+set(ROCM_HIPCC_COMPILER)
 
 include(FindPackageHandleStandardArgs)
 
@@ -164,48 +167,49 @@ function(find_rcm_module module_name)
 
 endfunction()
 
-# find main hcc component
-set(ROCM_HCC_COMPILER)
-if(HCC_ROOT)
-        find_path(
-            ROCM_HCC_COMPILER
-            NAMES bin/hcc
-            PATHS ${HCC_ROOT}
-            NO_DEFAULT_PATH
-        )
+function(find_rocm_compiler module_name exectuable_name)
+    string(TOUPPER ${module_name} MODULE_NAME_UPPER)
+    set(ROCM_${MODULE_NAME_UPPER}_COMPILER PARENT_SCOPE)
+    if(${MODULE_NAME_UPPER}_ROOT)
+            find_path(
+                ROCM_${MODULE_NAME_UPPER}_COMPILER
+                NAMES bin/${exectuable_name}
+                PATHS ${${MODULE_NAME_UPPER}_ROOT}
+                NO_DEFAULT_PATH
+            )
+        set(ROCM_${MODULE_NAME_UPPER}_COMPILER ${ROCM_${MODULE_NAME_UPPER}_COMPILER}/bin/${exectuable_name} PARENT_SCOPE)
+    elseif(ROCM_ROOT)
+            find_path(
+                ROCM_${MODULE_NAME_UPPER}_COMPILER
+                NAMES ${module_name}/bin/${exectuable_name}
+                PATHS ${ROCM_ROOT}
+                NO_DEFAULT_PATH
+            )
+        set(ROCM_${MODULE_NAME_UPPER}_COMPILER ${ROCM_${MODULE_NAME_UPPER}_COMPILER}/${module_name}/bin/${exectuable_name} PARENT_SCOPE)
+    else()
+            find_path(
+                ROCM_${MODULE_NAME_UPPER}_COMPILER
+                NAMES ${module_name}/bin/${exectuable_name}
+                PATHS "/opt/rocm"
+            )
+        set(ROCM_${MODULE_NAME_UPPER}_COMPILER ${ROCM_${MODULE_NAME_UPPER}_COMPILER}/${module_name}/bin/${exectuable_name} PARENT_SCOPE)
+    endif()
     find_package_handle_standard_args(ROCM FAIL_MESSAGE
-        "ROCM hcc compiler could not be found. Please specify ROCM_ROOT or HCC_ROOT."
-        REQUIRED_VARS ROCM_HCC_COMPILER)
-    set(ROCM_HCC_COMPILER ${ROCM_HCC_COMPILER}/bin/hcc)
-elseif(ROCM_ROOT)
-        find_path(
-            ROCM_HCC_COMPILER
-            NAMES hcc/bin/hcc
-            PATHS ${ROCM_ROOT}
-            NO_DEFAULT_PATH
-        )
-    find_package_handle_standard_args(ROCM FAIL_MESSAGE
-        "ROCM hcc compiler could not be found. Please specify ROCM_ROOT or HCC_ROOT."
-        REQUIRED_VARS ROCM_HCC_COMPILER)
-    set(ROCM_HCC_COMPILER ${ROCM_HCC_COMPILER}/hcc/bin/hcc)
-else()
-        find_path(
-            ROCM_HCC_COMPILER
-            NAMES hcc/bin/hcc
-            PATHS "/opt/rocm"
-        )
-    find_package_handle_standard_args(ROCM FAIL_MESSAGE
-        "ROCM hcc compiler could not be found. Please specify ROCM_ROOT or HCC_ROOT."
-        REQUIRED_VARS ROCM_HCC_COMPILER)
-    set(ROCM_HCC_COMPILER ${ROCM_HCC_COMPILER}/hcc/bin/hcc)
-endif()
+        "ROCM ${exectuable_name} executable could not be found. Please specify ROCM_ROOT or HCC_ROOT."
+        REQUIRED_VARS ROCM_${MODULE_NAME_UPPER}_COMPILER)
+endfunction()
+
+
+
+
+find_rocm_compiler(hcc hcc)
+message(STATUS "ROCM_HCC_COMPILER: ${ROCM_HCC_COMPILER}")
+find_rcm_module(hcc LTO OptRemarks mcwamp mcwamp_cpu mcwamp_hsa hc_am)
 if(ROCM_HCC_COMPILER)
     set(ROCM_FOUND TRUE)
-    message(STATUS "Found ROCM hcc compiler at ${ROCM_HCC_COMPILER}. RECOMMENDED: set CXX compiler accordingly!")
 else()
     set(ROCM_FOUND FALSE)
 endif()
-find_rcm_module(hcc LTO OptRemarks mcwamp mcwamp_cpu mcwamp_hsa hc_am)
 
 
 
@@ -214,6 +218,7 @@ foreach(module_name IN LISTS ROCM_FIND_COMPONENTS)
     # set required libaries for each module
     if(${module_name} STREQUAL hip)
         find_rcm_module(hip hip_hcc)
+        find_rocm_compiler(hip hipcc)
     elseif(${module_name} STREQUAL hipblas)
         find_rcm_module(hipblas hipblas)
     elseif(${module_name} STREQUAL hipblas)
