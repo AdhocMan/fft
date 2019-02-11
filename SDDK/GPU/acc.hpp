@@ -481,17 +481,16 @@ extern "C" void scale_matrix_elements_gpu(std::complex<double>* ptr__,
                                           int nrow__,
                                           int ncol__,
                                           double beta__);
-#endif
-#if defined(__ROCM)
-void scale_matrix_columns_gpu(int nrow, int ncol, void* mtrx, double* a) {
+#elif defined(__ROCM)
+inline void scale_matrix_columns_gpu(int nrow, int ncol, void* mtrx, double* a) {
     throw std::runtime_error("Not implemented for ROCM!");
 }
 
-void scale_matrix_rows_gpu(int nrow, int ncol, void* mtrx, double const* v) {
+inline void scale_matrix_rows_gpu(int nrow, int ncol, void* mtrx, double const* v) {
     throw std::runtime_error("Not implemented for ROCM!");
 }
 
-void scale_matrix_elements_gpu(std::complex<double>* ptr__,
+inline void scale_matrix_elements_gpu(std::complex<double>* ptr__,
                                           int ld__,
                                           int nrow__,
                                           int ncol__,
