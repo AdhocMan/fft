@@ -10,9 +10,6 @@ option(CUDA "Enable CUDA compilation" OFF)
 option(ROCM "Enable ROCM compilation" OFF)
 
 # TODO: implement cuda
-if(CUDA)
-	message(FATAL_ERROR "CUDA compilation not yet implemented!")
-endif()
 
 if(CUDA AND ROCM)
 	message(FATAL_ERROR "CUDA and ROCM must not be activated at the same time!")
@@ -23,6 +20,14 @@ if(CUDA)
 	set(LOCAL_DEFINITIONS ${LOCAL_DEFINITIONS} -D__CUDA -D__GPU)
 endif()
 
+if(CUDA)
+	set(LOCAL_SOURCES SDDK/GPU/fft_kernels.cu SDDK/GPU/checksum.cu SDDK/GPU/checksum.cu SDDK/GPU/scale_matrix.cu)
+endif()
+
+if(ROCM)
+	set(LOCAL_SOURCES ${LOCAL_SOURCES} SDDK/GPU/rocfft_interface.cpp)
+	set(LOCAL_SOURCES_HIP ${LOCAL_SOURCES_HIP} SDDK/GPU/fft_kernels.cpp)
+endif()
 
 
 
@@ -33,8 +38,7 @@ find_package(FFTW REQUIRED)
 find_package(Scalapack REQUIRED)
 find_package(BLAS REQUIRED)
 
-add_executable(test1 test_fft_correctness_1.cpp SDDK/GPU/rocfft_interface.cpp)
-
+add_executable(test1 test_fft_correctness_1.cpp ${LOCAL_SOURCES})
 
 set(EXTERNAL_LIBRARIES
 	${EXTERNAL_LIBRARIES}
@@ -76,16 +80,43 @@ if(ROCM)
 		)
 	add_definitions(-D__HIP_PLATFORM_HCC__)
 
-	set(${HCC_INCLUDE_FLAGS} "")
 	# generate include flags
+	set(FULL_PATH_INCLUDE_FLAGS)
 	foreach(dir IN LISTS EXTERNAL_INCLUDE_DIRS LOCAL_INCLUDE_DIRS)
-		set(HCC_INCLUDE_FLAGS ${HCC_INCLUDE_FLAGS} -I${dir})
+		if(NOT IS_ABSOLUTE ${dir})
+			get_filename_component(dir ${dir} ABSOLUTE)
+		endif()
+		set(FULL_PATH_INCLUDE_FLAGS ${FULL_PATH_INCLUDE_FLAGS} -I${dir})
 	endforeach()
 
-	# TODO add compile flags for build mode
-	# compile GPU kernels with hcc compiler
-	add_custom_target(fft_kernels COMMAND ${ROCM_HIP_COMPILER} ${CMAKE_CURRENT_SOURCE_DIR}/SDDK/GPU/fft_kernels.cpp --shared -fPIC -o ${PROJECT_BINARY_DIR}/libfft_kernels.so ${HCC_INCLUDE_FLAGS} -g
-		WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+	# generate full path to source files
+	set(FULL_PATH_HIP_SOURCES)
+	foreach(source IN LISTS LOCAL_SOURCES_HIP)
+		if(NOT IS_ABSOLUTE ${source})
+			get_filename_component(source ${source} ABSOLUTE)
+		endif()
+		set(FULL_PATH_HIP_SOURCES ${FULL_PATH_HIP_SOURCES} ${source})
+	endforeach()
+
+	# generate flags to use
+	set(CUSTOM_COMMAND_FLAGS ${CMAKE_CXX_FLAGS})
+	set(BUILD_TYPES DEBUG RELEASE RELWITHDEBINFO)
+	if(CMAKE_BUILD_TYPE)
+		foreach(type IN LISTS BUILD_TYPES)
+			string(TOUPPER ${CMAKE_BUILD_TYPE} BUILD_TYPE_UPPER)
+			if(${type} MATCHES ${BUILD_TYPE_UPPER})
+				set(CUSTOM_COMMAND_FLAGS ${CUSTOM_COMMAND_FLAGS} ${CMAKE_CXX_FLAGS_${type}})
+			endif()
+		endforeach()
+	endif()
+
+	if(NOT ROCM_HIPCC_EXECUTABLE)
+		message(FATAL_ERROR "HIPCC executable not found!")
+	endif()
+
+	# compile GPU kernels with hipcc compiler
+	add_custom_target(fft_kernels COMMAND ${ROCM_HIPCC_EXECUTABLE} ${FULL_PATH_HIP_SOURCES} --shared -fPIC -o ${PROJECT_BINARY_DIR}/libfft_kernels.so ${FULL_PATH_INCLUDE_FLAGS} ${CUSTOM_COMMAND_FLAGS}
+		WORKING_DIRECTORY ${PROJECT_BINARY_DIR} SOURCES ${FULL_PATH_HIP_SOURCES})
 	add_library(fft_kernels_lib SHARED IMPORTED)
 	set_target_properties(fft_kernels_lib PROPERTIES IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/libfft_kernels.so)
 	add_dependencies(fft_kernels_lib fft_kernels)
