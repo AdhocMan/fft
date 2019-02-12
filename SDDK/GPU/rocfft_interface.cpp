@@ -74,7 +74,7 @@ void* create_batch_plan(int rank, int* dims, int* embed, int stride, int dist, i
     if (embed != nullptr) {
         rocfft_plan_description_create(&desc);
 
-        size_t strides[3] = {stride, 1, 1};
+        size_t strides[3] = {(size_t)stride, 1, 1};
 
         size_t nembed_lengths[3] = {1, 1, 1};
         for (size_t i = 0; i < rank; i++) nembed_lengths[i] = embed[rank - 1 - i];
