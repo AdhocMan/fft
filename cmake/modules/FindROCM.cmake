@@ -4,25 +4,27 @@
 #   find_package(ROCM [REQUIRED] [QUIET] COMPONENTS [components ...] )
 #
 # Compnents available:
-#  - hip
 #  - hipblas
 #  - hipsparse
+#  - rocfft
 #  - rocblas
 #  - rocsparse
 #
 # It sets the following variables:
-#   ROCM_FOUND ----------- true if ROCM is found on the system
-#   ROCM_LIBRARIES ------- full path to ROCM
-#   ROCM_INCLUDE_DIRS ---- ROCM include directories
-#   ROCM_HCC_EXECUTABLE ---- ROCM HCC compiler
-#   ROCM_HCC-CONFIG_EXECUTABLE ---- ROCM HCC config
-#   [ROCM_HIPCC_EXECUTABLE]- ROCM HIPCC compiler (only defined of hip component requested)
-#   [ROCM_HIPCONFIG_EXECUTABLE]- ROCM hip config (only defined of hip component requested)
-#   [ROCM_HIPIFY-PERL_EXECUTABLE]- ROCM hipify (only defined of hip component requested)
+#   ROCM_FOUND ------------------- true if ROCM is found on the system
+#   ROCM_LIBRARIES --------------- full path to ROCM
+#   ROCM_INCLUDE_DIRS ------------ ROCM include directories
+#   ROCM_DEFINITIONS ------------- ROCM definitions
+#   ROCM_HCC_EXECUTABLE ---------- ROCM HCC compiler
+#   ROCM_HCC-CONFIG_EXECUTABLE --- ROCM HCC config
+#   ROCM_HIPCC_EXECUTABLE -------- HIPCC compiler
+#   ROCM_HIPCONFIG_EXECUTABLE ---- hip config
+#   ROCM_HIPIFY-PERL_EXECUTABLE -- hipify
+#   ROCM_HIP_PLATFORM ------------ Platform identifier: hcc or nvcc
 #
 # The following variables can be set to specify a search location
 #   ROCM_ROOT ------------ if set, the libraries are exclusively searched under this path
-#   {compnents}_ROOT ------ if set, search for component specific libraries at given path. Takes precedence over ROCM_ROOT
+#   <COMPONENT>_ROOT ------ if set, search for component specific libraries at given path. Takes precedence over ROCM_ROOT
 
 #If environment variable ROCM_ROOT is specified
 if(NOT ROCM_ROOT AND ENV{ROCM_ROOT})
@@ -33,6 +35,13 @@ endif()
 set(ROCM_FOUND FALSE)
 unset(ROCM_LIBRARIES)
 unset(ROCM_INCLUDE_DIRS)
+unset(ROCM_DEFINITIONS)
+unset(ROCM_HCC_EXECUTABLE)
+unset(ROCM_HCC-CONFIG_EXECUTABLE)
+unset(ROCM_HIPCC_EXECUTABLE)
+unset(ROCM_HIPCONFIG_EXECUTABLE)
+unset(ROCM_HIPFIY-PERL-EXECUTABLE)
+unset(ROCM_HIP_PLATFORM)
 
 include(FindPackageHandleStandardArgs)
 
@@ -63,7 +72,16 @@ function(find_rcm_module module_name)
     set(LIBRARY_NAMES ${ARGV})
     list(REMOVE_AT LIBRARY_NAMES 0)
 
-    # handler for error messages
+    if(${ROCM_FIND_REQUIRED})
+	set(ROCM_${MODULE_NAME_UPPER}_FIND_REQUIRED TRUE)
+    else()
+	set(ROCM_${MODULE_NAME_UPPER}_FIND_REQUIRED FALSE)
+    endif()
+    if(${ROCM_FIND_QUIETLY})
+	set(ROCM_${MODULE_NAME_UPPER}_FIND_QUIETLY TRUE)
+    else()
+	set(ROCM_${MODULE_NAME_UPPER}_FIND_QUIETLY FALSE)
+    endif()
 
     if(ROOT_DIR)
         # Root directory set for individual module
@@ -78,7 +96,7 @@ function(find_rcm_module module_name)
                 PATH_SUFFIXES "lib" "lib64"
                 NO_DEFAULT_PATH
             )
-            find_package_handle_standard_args(ROCM FAIL_MESSAGE
+	find_package_handle_standard_args(ROCM_${MODULE_NAME_UPPER} FAIL_MESSAGE
                 "For ROCM module ${module_name}, library ${library_name} could not be found. Please specify ROCM_ROOT or ${MODULE_NAME_UPPER}_ROOT." 
                 REQUIRED_VARS LIBRARIES_${library_name})
                 set(LIBRARIES_${MODULE_NAME_UPPER} ${LIBRARIES_${MODULE_NAME_UPPER}} ${LIBRARIES_${library_name}})
@@ -108,7 +126,7 @@ function(find_rcm_module module_name)
                 PATH_SUFFIXES "lib" "lib64" "${module_name}/lib" "${module_name}/lib64"
                 NO_DEFAULT_PATH
             )
-            find_package_handle_standard_args(ROCM FAIL_MESSAGE
+	find_package_handle_standard_args(ROCM_${MODULE_NAME_UPPER} FAIL_MESSAGE
                 "For ROCM module ${module_name}, library ${library_name} could not be found. Please specify ROCM_ROOT or ${MODULE_NAME_UPPER}_ROOT." 
                 REQUIRED_VARS LIBRARIES_${library_name})
                 set(LIBRARIES_${MODULE_NAME_UPPER} ${LIBRARIES_${MODULE_NAME_UPPER}} ${LIBRARIES_${library_name}})
@@ -134,7 +152,7 @@ function(find_rcm_module module_name)
                 PATHS "/opt/rocm/"
                 PATH_SUFFIXES "lib" "lib64" "${module_name}/lib" "${module_name}/lib64"
             )
-            find_package_handle_standard_args(ROCM FAIL_MESSAGE
+	find_package_handle_standard_args(ROCM_${MODULE_NAME_UPPER} FAIL_MESSAGE
                 "For ROCM module ${module_name}, library ${library_name} could not be found. Please specify ROCM_ROOT or ${MODULE_NAME_UPPER}_ROOT." 
                 REQUIRED_VARS LIBRARIES_${library_name})
                 set(LIBRARIES_${MODULE_NAME_UPPER} ${LIBRARIES_${MODULE_NAME_UPPER}} ${LIBRARIES_${library_name}})
@@ -154,7 +172,7 @@ function(find_rcm_module module_name)
 
 
     # check if all required parts found
-    find_package_handle_standard_args(ROCM FAIL_MESSAGE
+    find_package_handle_standard_args(ROCM_${MODULE_NAME_UPPER} FAIL_MESSAGE
         "ROCM module ${module_name} could not be found. Please specify ROCM_ROOT or ${MODULE_NAME_UPPER}_ROOT." 
         REQUIRED_VARS INCLUDE_DIRS_${MODULE_NAME_UPPER})
 
@@ -179,7 +197,9 @@ function(find_rocm_executable module_name executable_name)
                 PATHS ${${MODULE_NAME_UPPER}_ROOT}
                 NO_DEFAULT_PATH
             )
-        set(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE ${ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE}/bin/${executable_name} PARENT_SCOPE)
+	if(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE)
+	    set(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE ${ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE}/bin/${executable_name} PARENT_SCOPE)
+	endif()
     elseif(ROCM_ROOT)
             find_path(
                 ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE
@@ -187,50 +207,82 @@ function(find_rocm_executable module_name executable_name)
                 PATHS ${ROCM_ROOT}
                 NO_DEFAULT_PATH
             )
-        set(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE ${ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE}/${module_name}/bin/${executable_name} PARENT_SCOPE)
+	if(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE)
+	    set(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE ${ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE}/${module_name}/bin/${executable_name} PARENT_SCOPE)
+	endif()
     else()
             find_path(
                 ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE
                 NAMES ${module_name}/bin/${executable_name}
                 PATHS "/opt/rocm"
             )
-        set(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE ${ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE}/${module_name}/bin/${executable_name} PARENT_SCOPE)
+	if(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE)
+	    set(ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE ${ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE}/${module_name}/bin/${executable_name} PARENT_SCOPE)
+	endif()
+    endif()
+    if(${ROCM_FIND_REQUIRED})
+	set(ROCM_${MODULE_NAME_UPPER}_${EXECUTABLE_NAME_UPPER}_FIND_REQUIRED TRUE)
+    else()
+	set(ROCM_${MODULE_NAME_UPPER}_${EXECUTABLE_NAME_UPPER}_FIND_REQUIRED FALSE)
+    endif()
+    if(${ROCM_FIND_QUIETLY})
+	set(ROCM_${MODULE_NAME_UPPER}_${EXECUTABLE_NAME_UPPER}_FIND_QUIETLY TRUE)
+    else()
+	set(ROCM_${MODULE_NAME_UPPER}_${EXECUTABLE_NAME_UPPER}_FIND_QUIETLY FALSE)
     endif()
     find_package_handle_standard_args(ROCM FAIL_MESSAGE
-        "ROCM ${executable_name} executable could not be found. Please specify ROCM_ROOT or HCC_ROOT."
+	"ROCM_${MODULE_NAME_UPPER}_${EXECUTABLE_NAME_UPPER} ${executable_name} executable could not be found. Please specify ROCM_ROOT or ${MODULE_NAME_UPPER}_ROOT."
         REQUIRED_VARS ROCM_${EXECUTABLE_NAME_UPPER}_EXECUTABLE)
 endfunction()
 
 
 
 
+# find compilers
 find_rocm_executable(hcc hcc)
-find_rocm_executable(hcc hcc-config)
-find_rcm_module(hcc LTO OptRemarks mcwamp mcwamp_cpu mcwamp_hsa hc_am)
-if(ROCM_HCC_EXECUTABLE)
+find_rocm_executable(hip hipcc)
+
+if(ROCM_HIPCC_EXECUTABLE AND ROCM_HCC_EXECUTABLE)
     set(ROCM_FOUND TRUE)
 else()
     set(ROCM_FOUND FALSE)
+    return()
 endif()
 
 
+# find other executables and libraries
+find_rocm_executable(hcc hcc-config)
+find_rocm_executable(hip hipconfig)
+find_rocm_executable(hip hipify-perl)
+find_rcm_module(hcc LTO OptRemarks mcwamp mcwamp_cpu mcwamp_hsa hc_am)
+find_rcm_module(hip hip_hcc)
+
+
+# parse hip config
+execute_process(COMMAND ${ROCM_HIPCONFIG_EXECUTABLE} -P OUTPUT_VARIABLE ROCM_HIP_PLATFORM RESULT_VARIABLE RESULT_VALUE)
+if(NOT ${RESULT_VALUE} EQUAL 0)
+    message(FATAL_ERROR "Error parsing platform identifier from hipconfig! Code: ${RESULT_VALUE}")
+endif()
+if(NOT ROCM_HIP_PLATFORM)
+    message(FATAL_ERROR "Empty platform identifier from hipconfig!")
+endif()
+
+# set definitions
+if(${ROCM_HIP_PLATFORM} STREQUAL hcc)
+    set(ROCM_DEFINITIONS -D__HIP_PLATFORM_HCC__)
+elseif(${ROCM_HIP_PLATFORM} STREQUAL nvcc)
+    set(ROCM_DEFINITIONS -D__HIP_PLATFORM_NVCC__)
+else()
+    message(FATAL_ERROR "Could not parse platform identifier from hipconfig! Value: ${ROCM_HIP_PLATFORM}")
+endif()
 
 # find libraries for each specified components
 foreach(module_name IN LISTS ROCM_FIND_COMPONENTS)
     # set required libaries for each module
-    if(${module_name} STREQUAL hip)
-        find_rcm_module(hip hip_hcc)
-        find_rocm_executable(hip hipcc)
-        find_rocm_executable(hip hipconfig)
-        find_rocm_executable(hip hipify-perl)
-    elseif(${module_name} STREQUAL hipblas)
-        find_rcm_module(hipblas hipblas)
-    elseif(${module_name} STREQUAL hipblas)
+    if(${module_name} STREQUAL hipblas)
         find_rcm_module(hipblas hipblas)
     elseif(${module_name} STREQUAL hipsparse)
-        find_rcm_module(hipblas hipsparse)
-    elseif(${module_name} STREQUAL hsa)
-        find_rcm_module(hsa hsa-ext-image64 hsa-runtime-tools64 hsa-runtime64)
+        find_rcm_module(hipsparse hipsparse)
     elseif(${module_name} STREQUAL rocblas)
         find_rcm_module(rocblas rocblas)
     elseif(${module_name} STREQUAL rocsparse)
@@ -242,6 +294,115 @@ foreach(module_name IN LISTS ROCM_FIND_COMPONENTS)
     endif()
 endforeach()
 
-mark_as_advanced(ROCM_LIBRARIES)
-mark_as_advanced(ROCM_INCLUDE_DIRS)
-mark_as_advanced(ROCM_FOUND)
+
+# Generates library compiled with hipcc
+# Usage:
+#   rocm_hip_add_library(<name> <sources> [STATIC | SHARED] [FLAGS] <flags> [OUTPUT_DIR] <dir> [INCLUDE_DIRS] <dirs ...>)
+macro(rocm_hip_add_library)
+    cmake_parse_arguments(
+        HIP_LIB
+        "SHARED;STATIC"
+        "OUTPUT_DIR"
+        "FLAGS;INCLUDE_DIRS"
+        ${ARGN}
+    )
+    # allow either STATIC or SHARED
+    if(HIP_LIB_SHARED AND HIP_LIB_STATIC)
+        message(FATAL_ERROR "rocm_hip_add_library: library cannot by both static and shared!")
+    endif()
+
+    # default to SHARED
+    if(NOT (HIP_LIB_SHARED OR HIP_LIB_STATIC))
+        set(HIP_LIB_SHARED TRUE)
+    endif()
+
+    # default to top level build directory
+    if(NOT HIP_LIB_OUTPUT_DIR)
+        set(HIP_LIB_OUTPUT_DIR ${PROJECT_BINARY_DIR})
+    endif()
+
+    # parse positional arguments
+    list(LENGTH HIP_LIB_UNPARSED_ARGUMENTS NARGS)
+    if(${NARGS} LESS 2)
+        message(FATAL_ERROR "rocm_hip_add_library: Not enough arguments!")
+    endif()
+    list(GET HIP_LIB_UNPARSED_ARGUMENTS 0 HIP_LIB_NAME)
+    list(REMOVE_AT HIP_LIB_UNPARSED_ARGUMENTS 0)
+    set(HIP_LIB_SOURCES ${HIP_LIB_UNPARSED_ARGUMENTS})
+
+	# generate include flags
+    unset(ROCM_INTERNAL_FULL_PATH_INCLUDE_FLAGS)
+    foreach(dir IN LISTS HIP_LIB_INCLUDE_DIRS)
+		if(NOT IS_ABSOLUTE ${dir})
+			get_filename_component(dir ${dir} ABSOLUTE)
+		endif()
+		set(ROCM_INTERNAL_FULL_PATH_INCLUDE_FLAGS ${ROCM_INTERNAL_FULL_PATH_INCLUDE_FLAGS} -I${dir})
+	endforeach()
+
+	# generate full path to source files
+	unset(ROCM_INTERNAL_SOURCES)
+    foreach(source IN LISTS HIP_LIB_SOURCES)
+		if(NOT IS_ABSOLUTE ${source})
+			get_filename_component(source ${source} ABSOLUTE)
+		endif()
+		set(ROCM_INTERNAL_SOURCES ${ROCM_INTERNAL_SOURCES} ${source})
+	endforeach()
+
+	# generate flags to use
+	set(ROCM_INTERNAL_FLAGS ${CMAKE_CXX_FLAGS})
+	set(ROCM_INTERNAL_BUILD_TYPES DEBUG RELEASE RELWITHDEBINFO)
+	if(CMAKE_BUILD_TYPE)
+		foreach(type IN LISTS ROCM_INTERNAL_BUILD_TYPES)
+			string(TOUPPER ${CMAKE_BUILD_TYPE} BUILD_TYPE_UPPER)
+			if(${type} MATCHES ${BUILD_TYPE_UPPER})
+				set(ROCM_INTERNAL_FLAGS ${ROCM_INTERNAL_FLAGS} ${CMAKE_CXX_FLAGS_${type}})
+			endif()
+		endforeach()
+	endif()
+
+	if(NOT ROCM_HIPCC_EXECUTABLE)
+		message(FATAL_ERROR "HIPCC executable not found!")
+	endif()
+
+    if(HIP_LIB_SHARED)
+        set(ROCM_INTERNAL_FLAGS ${ROCM_INTERNAL_FLAGS} --shared -fPIC -o ${HIP_LIB_OUTPUT_DIR}/lib${HIP_LIB_NAME}.so)
+    endif()
+    if(HIP_LIB_STATIC)
+        set(ROCM_INTERNAL_FLAGS ${ROCM_INTERNAL_FLAGS} -c)
+    endif()
+
+	# compile GPU kernels with hipcc compiler
+    add_custom_target(HIP_TARGET_${HIP_LIB_NAME} COMMAND ${ROCM_HIPCC_EXECUTABLE} ${ROCM_INTERNAL_SOURCES} ${ROCM_INTERNAL_FLAGS} ${ROCM_INTERNAL_FULL_PATH_INCLUDE_FLAGS}
+        WORKING_DIRECTORY ${HIP_LIB_OUTPUT_DIR} SOURCES ${ROCM_INTERNAL_SOURCES})
+
+    # shared library
+    if(HIP_LIB_SHARED)
+        add_library(${HIP_LIB_NAME} SHARED IMPORTED)
+        set_target_properties(${HIP_LIB_NAME} PROPERTIES IMPORTED_LOCATION ${HIP_LIB_OUTPUT_DIR}/lib${HIP_LIB_NAME}.so)
+    endif()
+
+    # static library
+    if(HIP_LIB_STATIC)
+        # generate object file names
+        unset(ROCM_INTERNAL_OBJS)
+        foreach(file IN LISTS ROCM_INTERNAL_SOURCES)
+            string(REGEX REPLACE "\\.[^.]*$" "" file ${file})
+            get_filename_component(file ${file} NAME)
+            set(ROCM_INTERNAL_OBJS ${ROCM_INTERNAL_OBJS} ${HIP_LIB_OUTPUT_DIR}/${file}.o)
+        endforeach()
+
+        # create library from object files
+        add_library(${HIP_LIB_NAME} ${ROCM_INTERNAL_OBJS})
+        set_target_properties(${HIP_LIB_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+        set_source_files_properties(
+            ${ROCM_INTERNAL_OBJS}
+            PROPERTIES
+            EXTERNAL_OBJECT true
+            GENERATED true
+            )
+    endif()
+
+    # create library / object files before linking
+    add_dependencies(${HIP_LIB_NAME} HIP_TARGET_${HIP_LIB_NAME})
+endmacro()
+

@@ -68,8 +68,13 @@ set(EXTERNAL_LINK_FLAGS ${EXTERNAL_LINK_FLAGS} ${MPI_CXX_LINK_FLAGS} ${BLAS_LINK
 set(LOCAL_INCLUDE_DIRS utils SDDK SDDK/GPU ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(ROCM)
-	find_package(ROCM REQUIRED COMPONENTS hip rocfft)
+	find_package(ROCM COMPONENTS rocfft)
+	if(NOT ${ROCM_HIP_PLATFORM} STREQUAL hcc)
+		message(FATAL_ERROR "Compilation on Nvidia platform not supported with ROCM enabled!")
+	endif()
+
 	set(LOCAL_DEFINITIONS ${LOCAL_DEFINITIONS} -D__ROCM -D__GPU)
+	set(EXTERNAL_DEFINITIONS ${EXTERNAL_DEFINITIONS} ${ROCM_DEFINITIONS})
 	set(EXTERNAL_LIBRARIES
 		${EXTERNAL_LIBRARIES}
 		${ROCM_LIBRARIES}
@@ -78,49 +83,9 @@ if(ROCM)
 		${EXTERNAL_INCLUDE_DIRS}
 		${ROCM_INCLUDE_DIRS}
 		)
-	add_definitions(-D__HIP_PLATFORM_HCC__)
 
-	# generate include flags
-	set(FULL_PATH_INCLUDE_FLAGS)
-	foreach(dir IN LISTS EXTERNAL_INCLUDE_DIRS LOCAL_INCLUDE_DIRS)
-		if(NOT IS_ABSOLUTE ${dir})
-			get_filename_component(dir ${dir} ABSOLUTE)
-		endif()
-		set(FULL_PATH_INCLUDE_FLAGS ${FULL_PATH_INCLUDE_FLAGS} -I${dir})
-	endforeach()
-
-	# generate full path to source files
-	set(FULL_PATH_HIP_SOURCES)
-	foreach(source IN LISTS LOCAL_SOURCES_HIP)
-		if(NOT IS_ABSOLUTE ${source})
-			get_filename_component(source ${source} ABSOLUTE)
-		endif()
-		set(FULL_PATH_HIP_SOURCES ${FULL_PATH_HIP_SOURCES} ${source})
-	endforeach()
-
-	# generate flags to use
-	set(CUSTOM_COMMAND_FLAGS ${CMAKE_CXX_FLAGS})
-	set(BUILD_TYPES DEBUG RELEASE RELWITHDEBINFO)
-	if(CMAKE_BUILD_TYPE)
-		foreach(type IN LISTS BUILD_TYPES)
-			string(TOUPPER ${CMAKE_BUILD_TYPE} BUILD_TYPE_UPPER)
-			if(${type} MATCHES ${BUILD_TYPE_UPPER})
-				set(CUSTOM_COMMAND_FLAGS ${CUSTOM_COMMAND_FLAGS} ${CMAKE_CXX_FLAGS_${type}})
-			endif()
-		endforeach()
-	endif()
-
-	if(NOT ROCM_HIPCC_EXECUTABLE)
-		message(FATAL_ERROR "HIPCC executable not found!")
-	endif()
-
-	# compile GPU kernels with hipcc compiler
-	add_custom_target(fft_kernels COMMAND ${ROCM_HIPCC_EXECUTABLE} ${FULL_PATH_HIP_SOURCES} --shared -fPIC -o ${PROJECT_BINARY_DIR}/libfft_kernels.so ${FULL_PATH_INCLUDE_FLAGS} ${CUSTOM_COMMAND_FLAGS}
-		WORKING_DIRECTORY ${PROJECT_BINARY_DIR} SOURCES ${FULL_PATH_HIP_SOURCES})
-	add_library(fft_kernels_lib SHARED IMPORTED)
-	set_target_properties(fft_kernels_lib PROPERTIES IMPORTED_LOCATION ${PROJECT_BINARY_DIR}/libfft_kernels.so)
-	add_dependencies(fft_kernels_lib fft_kernels)
-	set(EXTERNAL_LIBRARIES ${EXTERNAL_LIBRARIES} fft_kernels_lib)
+	rocm_hip_add_library(fft_kernels SHARED SDDK/GPU/fft_kernels.cpp INCLUDE_DIRS ${EXTERNAL_INCLUDE_DIRS} ${LOCAL_INCLUDE_DIRS})
+	target_link_libraries(test1 PRIVATE fft_kernels)
 endif()
 
 target_include_directories(test1 PRIVATE  ${LOCAL_INCLUDE_DIRS} ${EXTERNAL_INCLUDE_DIRS})
