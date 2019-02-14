@@ -32,6 +32,7 @@ struct rocfft_handler {
     rocfft_execution_info info = nullptr;
     void* work_buffer = nullptr;
     size_t work_size = 0;
+    hipStream_t stream = 0;
 };
 
 void initialize() { CALL_ROCFFT(rocfft_setup, ()); }
@@ -47,7 +48,6 @@ void destroy_plan_handle(void* plan)
     if (handler->plan_backward != nullptr)
         CALL_ROCFFT(rocfft_plan_destroy, (handler->plan_backward));
     if (handler->info != nullptr) CALL_ROCFFT(rocfft_execution_info_destroy, (handler->info));
-    // if (handler->work_buffer != nullptr) CALL_HIP(hipFree(handler->work_buffer));
 
     // free handler itself
     delete handler;
@@ -129,9 +129,6 @@ size_t get_work_size(void* plan)
 void set_work_area(void* plan, void* work_area)
 {
     rocfft_handler* handler = static_cast<rocfft_handler*>(plan);
-    if (handler->work_buffer != nullptr) {
-        CALL_HIP(hipFree(handler->work_buffer));
-    }
     handler->work_buffer = work_area;
     CALL_ROCFFT(rocfft_execution_info_set_work_buffer,
                 (handler->info, work_area, handler->work_size));
