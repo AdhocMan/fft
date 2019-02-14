@@ -139,7 +139,7 @@ extern "C" void batch_load_gpu(int                    fft_size,
 
     hipStream_t stream = (hipStream_t) acc::stream(stream_id(stream_id__));
 
-    acc::zero(fft_buffer, fft_size * num_fft);
+    hipMemsetAsync(fft_buffer, 0, fft_size * num_fft * sizeof(double2), stream);
 
     hipLaunchKernelGGL((batch_load_gpu_kernel), dim3(grid_b), dim3(grid_t), 0, stream, 
         fft_size,
@@ -191,7 +191,7 @@ extern "C" void batch_unload_gpu(int                    fft_size,
     hipStream_t stream = (hipStream_t) acc::stream(stream_id(stream_id__));
 
     if (alpha == 0) {
-        acc::zero(data, num_pw_components);
+        hipMemsetAsync(data, 0, num_pw_components * sizeof(double2), stream);
     }
 
     hipLaunchKernelGGL((batch_unload_gpu_kernel), dim3(grid_b), dim3(grid_t), 0, stream, 

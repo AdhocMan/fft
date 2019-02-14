@@ -1082,9 +1082,6 @@ class FFT3D : public FFT3D_grid
         if (!gvec_partition_) {
             TERMINATE("FFT3D is not ready");
         }
-#if defined(__ROCM)
-    if(mem == memory_t::device) fft_buffer_aux1_.zero(memory_t::device);
-#endif
 
         switch (direction) {
             case 1: {
@@ -1124,13 +1121,6 @@ class FFT3D : public FFT3D_grid
         if (!gvec_partition_->gvec().reduced()) {
             TERMINATE("reduced set of G-vectors is required");
         }
-
-#if defined(__ROCM)
-    if(mem == memory_t::device) {
-      fft_buffer_aux1_.zero(memory_t::device);
-      fft_buffer_aux2_.zero(memory_t::device);
-    }
-#endif
 
         switch (direction) {
             case 1: {
